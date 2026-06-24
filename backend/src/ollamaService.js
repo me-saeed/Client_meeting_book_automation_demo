@@ -2,8 +2,9 @@ import 'dotenv/config'
 
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
 export const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma2:2b'
-const SUMMARY_MAX_CHARS = 12_000
-const QA_MAX_CHARS = 12_000
+const SUMMARY_MAX_CHARS = 3_000
+const QA_MAX_CHARS = 3_000
+const MAX_HISTORY_MESSAGES = 6
 const OLLAMA_TIMEOUT_MS = 300_000
 
 function truncateForPrompt(text, maxChars) {
@@ -12,6 +13,10 @@ function truncateForPrompt(text, maxChars) {
     text.slice(0, maxChars) +
     '\n\n[... document truncated for model context limit ...]'
   )
+}
+
+function trimHistory(history) {
+  return history.slice(-MAX_HISTORY_MESSAGES)
 }
 
 export async function checkOllamaHealth() {
@@ -36,7 +41,7 @@ export async function chatCompletion(messages) {
         stream: false,
         options: {
           temperature: 0.3,
-          num_ctx: 8192,
+          num_ctx: 4096,
         },
       }),
     })
@@ -44,7 +49,9 @@ export async function chatCompletion(messages) {
     if (err.name === 'AbortError') {
       throw new Error('Ollama request timed out. Try a smaller PDF or a faster model.')
     }
-    throw err
+    throw new Error(
+      `Cannot reach Ollama at ${OLLAMA_BASE_URL}. Make sure Ollama is running.`,
+    )
   } finally {
     clearTimeout(timeout)
   }
@@ -63,32 +70,26 @@ export function buildSummaryMessages(documentText, filename) {
     {
       role: 'system',
       content:
-        'You are a helpful document analyst. Summarize PDF documents clearly and accurately. Use markdown formatting with headings and bullet points when helpful.',
+        'You are a helpful document analyst. Summarize PDF documents clearly and accurately. Use markdown with headings and bullet points.',
     },
     {
       role: 'user',
-      content: `Summarize the following PDF document titled '${filename}'. Include: main topic, key points, and any notable conclusions.\n\n--- DOCUMENT START ---\n${truncateForPrompt(documentText, SUMMARY_MAX_CHARS)}\n--- DOCUMENT END ---`,
+      content: `Summarize this PDF titled '${filename}'. Include the main topic, key points, and conclusions.\n\n${truncateForPrompt(documentText, SUMMARY_MAX_CHARS)}`,
     },
   ]
 }
 
 export function buildQaMessages(documentText, filename, question, history) {
-  const messages = [
+  return [
     {
       role: 'system',
-      content: `You answer questions about the PDF '${filename}' using only the provided document context. If the answer is not in the document, say you cannot find it in the PDF. Be concise and accurate.`,
+      content: `Answer questions about '${filename}' using only the document below. If the answer is not in the document, say so.`,
     },
     {
       role: 'user',
-      content: `Document context:\n--- DOCUMENT START ---\n${truncateForPrompt(documentText, QA_MAX_CHARS)}\n--- DOCUMENT END ---`,
+      content: `Document:\n${truncateForPrompt(documentText, QA_MAX_CHARS)}`,
     },
-    {
-      role: 'assistant',
-      content: 'I have read the document and am ready to answer questions about it.',
-    },
-    ...history.map(({ role, content }) => ({ role, content })),
+    ...trimHistory(history),
     { role: 'user', content: question },
   ]
-
-  return messages
 }

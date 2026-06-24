@@ -1,4 +1,4 @@
-const API_BASE = '/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
 
 function parseErrorDetail(data, fallback) {
   if (!data?.detail) return fallback
@@ -13,38 +13,51 @@ async function parseResponse(response, fallbackMessage) {
   return data
 }
 
+async function apiFetch(path, options, fallbackMessage) {
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, options)
+  } catch {
+    throw new Error(
+      `${fallbackMessage}: could not reach the backend at ${API_BASE}. Is it running on port 8000?`,
+    )
+  }
+  return parseResponse(response, fallbackMessage)
+}
+
 export async function uploadPdf(file) {
   const formData = new FormData()
   formData.append('file', file)
 
-  let response
-  try {
-    response = await fetch(`${API_BASE}/upload`, {
-      method: 'POST',
-      body: formData,
-    })
-  } catch {
-    throw new Error(
-      'Upload failed: could not reach the server. Make sure the backend is running on port 8000.',
-    )
-  }
+  return apiFetch(
+    '/upload',
+    { method: 'POST', body: formData },
+    'Upload failed',
+  )
+}
 
-  return parseResponse(response, 'Upload failed')
+export async function summarizePdf(sessionId) {
+  return apiFetch(
+    '/summarize',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    },
+    'Summary failed',
+  )
 }
 
 export async function sendMessage(sessionId, message) {
-  let response
-  try {
-    response = await fetch(`${API_BASE}/chat`, {
+  return apiFetch(
+    '/chat',
+    {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, message }),
-    })
-  } catch {
-    throw new Error('Chat request failed: could not reach the server.')
-  }
-
-  return parseResponse(response, 'Chat request failed')
+    },
+    'Chat request failed',
+  )
 }
 
 export async function checkHealth() {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { checkHealth, sendMessage, uploadPdf } from './api'
+import { checkHealth, sendMessage, summarizePdf, uploadPdf } from './api'
 import ChatInput from './components/ChatInput'
 import Header from './components/Header'
 import MessageList from './components/MessageList'
@@ -12,6 +12,7 @@ export default function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [summarizing, setSummarizing] = useState(false)
   const [error, setError] = useState(null)
   const [ollamaOnline, setOllamaOnline] = useState(null)
   const [dragOver, setDragOver] = useState(false)
@@ -38,6 +39,7 @@ export default function App() {
 
     setError(null)
     setUploading(true)
+    setSummarizing(false)
     setMessages([])
     setSessionId(null)
     setFilename(null)
@@ -46,17 +48,28 @@ export default function App() {
       const data = await uploadPdf(file)
       setSessionId(data.sessionId)
       setFilename(data.filename)
+      setSummarizing(true)
+      setMessages([
+        {
+          id: 'summarizing',
+          role: 'assistant',
+          content: `Uploaded **${data.filename}**. Generating summary...`,
+        },
+      ])
+
+      const summaryData = await summarizePdf(data.sessionId)
       setMessages([
         {
           id: 'summary',
           role: 'assistant',
-          content: `**Summary of "${data.filename}"**\n\n${data.summary}`,
+          content: `**Summary of "${data.filename}"**\n\n${summaryData.summary}`,
         },
       ])
     } catch (err) {
       setError(err.message)
     } finally {
       setUploading(false)
+      setSummarizing(false)
     }
   }, [])
 
@@ -131,7 +144,7 @@ export default function App() {
           messages={messages}
           hasSession={hasSession}
           filename={filename}
-          loading={loading}
+          loading={loading || summarizing}
           uploading={uploading}
           dragOver={dragOver}
           messagesEndRef={messagesEndRef}
@@ -145,7 +158,7 @@ export default function App() {
         <ChatInput
           hasSession={hasSession}
           input={input}
-          loading={loading}
+          loading={loading || summarizing}
           error={error}
           textareaRef={textareaRef}
           onInputChange={(e) => setInput(e.target.value)}

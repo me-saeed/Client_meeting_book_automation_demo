@@ -41,12 +41,7 @@ function handleUpload(req, res, next) {
   })
 }
 
-app.use(
-  cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true,
-  }),
-)
+app.use(cors({ origin: true, credentials: true }))
 app.use(express.json())
 
 app.get('/api/health', async (_req, res) => {
@@ -84,11 +79,41 @@ app.post(
     }
 
     const documentText = await extractTextFromPdf(file.buffer)
+    const sessionId = uuidv4()
+
+    sessions.set(sessionId, {
+      filename: file.originalname,
+      documentText,
+      summary: null,
+      history: [],
+    })
+
+    res.json({
+      sessionId,
+      filename: file.originalname,
+      charCount: documentText.length,
+    })
+  }),
+)
+
+app.post(
+  '/api/summarize',
+  asyncHandler(async (req, res) => {
+    const { sessionId } = req.body || {}
+    const session = sessions.get(sessionId)
+
+    if (!session) {
+      return res.status(404).json({ detail: 'Session not found. Upload a PDF first.' })
+    }
+
+    if (session.summary) {
+      return res.json({ summary: session.summary })
+    }
 
     let summary
     try {
       summary = await chatCompletion(
-        buildSummaryMessages(documentText, file.originalname),
+        buildSummaryMessages(session.documentText, session.filename),
       )
     } catch (err) {
       return res.status(502).json({
@@ -96,20 +121,8 @@ app.post(
       })
     }
 
-    const sessionId = uuidv4()
-    sessions.set(sessionId, {
-      filename: file.originalname,
-      documentText,
-      summary,
-      history: [],
-    })
-
-    res.json({
-      sessionId,
-      filename: file.originalname,
-      summary,
-      charCount: documentText.length,
-    })
+    session.summary = summary
+    res.json({ summary })
   }),
 )
 
@@ -152,13 +165,16 @@ app.post(
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err)
-  res.status(500).json({ detail: err.message || 'Internal server error.' })
+  if (!res.headersSent) {
+    res.status(500).json({ detail: err.message || 'Internal server error.' })
+  }
 })
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`PDF Agent API running at http://localhost:${PORT}`)
   console.log(`Ollama model: ${OLLAMA_MODEL}`)
 })
 
 server.requestTimeout = 600_000
 server.headersTimeout = 610_000
+server.keepAliveTimeout = 620_000
