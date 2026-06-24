@@ -1,11 +1,11 @@
-import 'dotenv/config'
-
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
-export const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma2:2b'
-const SUMMARY_MAX_CHARS = 3_000
-const QA_MAX_CHARS = 3_000
-const MAX_HISTORY_MESSAGES = 6
-const OLLAMA_TIMEOUT_MS = 300_000
+import {
+  OLLAMA_BASE_URL,
+  OLLAMA_MODEL,
+  OLLAMA_TIMEOUT_MS,
+  QA_MAX_CHARS,
+  SUMMARY_MAX_CHARS,
+  MAX_HISTORY_MESSAGES,
+} from '../config/env.js'
 
 function truncateForPrompt(text, maxChars) {
   if (text.length <= maxChars) return text
@@ -18,6 +18,8 @@ function truncateForPrompt(text, maxChars) {
 function trimHistory(history) {
   return history.slice(-MAX_HISTORY_MESSAGES)
 }
+
+export { OLLAMA_MODEL }
 
 export async function checkOllamaHealth() {
   const response = await fetch(`${OLLAMA_BASE_URL}/api/tags`)

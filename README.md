@@ -82,9 +82,10 @@ OLLAMA_MODEL=gemma2:2b
 
 | Method | Path           | Description                    |
 |--------|----------------|--------------------------------|
-| GET    | `/api/health`  | Health check + Ollama status   |
-| POST   | `/api/upload`  | Upload PDF, returns summary    |
-| POST   | `/api/chat`    | Ask a question about the PDF   |
+| GET    | `/api/health`    | Health check + Ollama status   |
+| POST   | `/api/upload`    | Upload PDF, extract text       |
+| POST   | `/api/summarize` | Generate PDF summary           |
+| POST   | `/api/chat`      | Ask a question about the PDF   |
 
 ## Project Structure
 
@@ -92,9 +93,24 @@ OLLAMA_MODEL=gemma2:2b
 PDFAgent/
 ├── backend/
 │   ├── src/
-│   │   ├── index.js          # Express app
-│   │   ├── pdfService.js     # PDF text extraction
-│   │   └── ollamaService.js  # Ollama chat integration
+│   │   ├── index.js              # Server entry point
+│   │   ├── app.js                # Express app setup
+│   │   ├── config/
+│   │   │   └── env.js            # Environment & constants
+│   │   ├── routes/
+│   │   │   └── index.js          # API route definitions
+│   │   ├── controllers/
+│   │   │   ├── health.controller.js
+│   │   │   └── pdf.controller.js
+│   │   ├── services/
+│   │   │   ├── ollama.service.js # Ollama integration
+│   │   │   ├── pdf.service.js    # PDF text extraction
+│   │   │   └── session.service.js
+│   │   ├── middleware/
+│   │   │   ├── error.middleware.js
+│   │   │   └── upload.middleware.js
+│   │   └── utils/
+│   │       └── asyncHandler.js
 │   └── package.json
 └── frontend/
     ├── src/

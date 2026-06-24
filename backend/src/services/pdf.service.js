@@ -1,6 +1,5 @@
 import pdf from 'pdf-parse/lib/pdf-parse.js'
-
-const MAX_CHARS = 120_000
+import { PDF_MAX_CHARS } from '../config/env.js'
 
 export async function extractTextFromPdf(buffer) {
   let result
@@ -23,6 +22,6 @@ export async function extractTextFromPdf(buffer) {
 }
 
 function truncateText(text) {
-  if (text.length <= MAX_CHARS) return text
-  return text.slice(0, MAX_CHARS) + '\n\n[... document truncated for context limit ...]'
+  if (text.length <= PDF_MAX_CHARS) return text
+  return text.slice(0, PDF_MAX_CHARS) + '\n\n[... document truncated for context limit ...]'
 }
